@@ -53,22 +53,21 @@ public class Polynomial {
 	}
 
 	/**
-	 * Returns the sum of two polynomials - DOES NOT change either of the input
+	 * Returns the tail of two polynomials - DOES NOT change either of the input
 	 * polynomials. The returned polynomial MUST have all new nodes. In other words,
 	 * none of the nodes of the input polynomials can be in the result.
 	 * 
 	 * @param poly1 First input polynomial (front of polynomial linked list)
 	 * @param poly2 Second input polynomial (front of polynomial linked list
-	 * @return A new polynomial which is the sum of the input polynomials - the
+	 * @return A new polynomial which is the tail of the input polynomials - the
 	 *         returned node is the front of the result polynomial
 	 */
 	public static Node add(Node poly1, Node poly2) {
 		Node head = null;
-		Node sum = null;
+		Node tail = null;
+		Node next;
 
 		while (poly1 != null && poly2 != null) {
-			Node next;
-
 			if (poly1.term.degree == poly2.term.degree) {
 				next = new Node(poly1.term.coeff + poly2.term.coeff, poly1.term.degree, null);
 				poly1 = poly1.next;
@@ -81,70 +80,69 @@ public class Polynomial {
 				poly2 = poly2.next;
 			}
 
-			if (sum != null) {
-				sum = sum.next = next;
-			} else {
-				head = sum = next;
+			if (next.term.coeff != 0) {
+				if (tail != null) {
+					tail = tail.next = next;
+				} else {
+					head = tail = next;
+				}
 			}
 		}
 
-		while (poly1 != null) {
-			Node next = new Node(poly1.term.coeff, poly1.term.degree, null);
+		Node poly = poly1 == null ? poly2 : poly1;
+		
+		while (poly != null) {
+			next = new Node(poly.term.coeff, poly.term.degree, null);
 
-			if (sum != null) {
-				sum = sum.next = next;
-			} else {
-				head = sum = next;
+			if (next.term.coeff != 0) {
+				if (tail != null) {
+					tail = tail.next = next;
+				} else {
+					head = tail = next;
+				}
 			}
 
-			poly1 = poly1.next;
-		}
-
-		while (poly2 != null) {
-			Node next = new Node(poly2.term.coeff, poly2.term.degree, null);
-
-			if (sum != null) {
-				sum = sum.next = next;
-			} else {
-				head = sum = next;
-			}
-
-			poly2 = poly2.next;
+			poly = poly.next;
 		}
 
 		return head;
 	}
 
 	/**
-	 * Returns the product of two polynomials - DOES NOT change either of the input
+	 * Returns the tail of two polynomials - DOES NOT change either of the input
 	 * polynomials. The returned polynomial MUST have all new nodes. In other words,
 	 * none of the nodes of the input polynomials can be in the result.
 	 * 
 	 * @param poly1 First input polynomial (front of polynomial linked list)
 	 * @param poly2 Second input polynomial (front of polynomial linked list)
-	 * @return A new polynomial which is the product of the input polynomials - the
+	 * @return A new polynomial which is the tail of the input polynomials - the
 	 *         returned node is the front of the result polynomial
 	 */
 	public static Node multiply(Node poly1, Node poly2) {
-		Node product = null;
 		Node head = null;
-		Node poly2Head = poly2;
+		Node polyHead = poly2;
 
 		while (poly1 != null) {
-			poly2 = poly2Head;
+			poly2 = polyHead;
+			
+			Node head1 = null;
+			Node tail1 = null;
 
 			while (poly2 != null) {
 				Node next = new Node(poly1.term.coeff * poly2.term.coeff, poly1.term.degree + poly2.term.degree, null);
 
-				if (product != null) {
-					product = product.next = next;
-				} else {
-					head = product = next;
+				if (next.term.coeff != 0) {
+					if (tail1 != null) {
+						tail1 = tail1.next = next;
+					} else {
+						head1 = tail1 = next;
+					}
 				}
 
 				poly2 = poly2.next;
 			}
-
+			
+			head = Polynomial.add(head, head1);
 			poly1 = poly1.next;
 		}
 
