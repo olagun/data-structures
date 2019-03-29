@@ -49,7 +49,7 @@ public class Tree {
 			if (line.charAt(1) == '/')
 				return parent;
 
-			String tagName = line.substring(1, line.indexOf('>'));
+			String tagName = line.substring(1, line.length() - 1);
 			addChild(parent, build(new TagNode(tagName, null, null)));
 		} else {
 			addChild(parent, new TagNode(line, null, null));
@@ -66,23 +66,28 @@ public class Tree {
 	 * object.
 	 */
 	public void build() {
-		/** COMPLETE THIS METHOD **/
-		this.root = build(new TagNode("root", null, null)).firstChild;
+		TagNode tmpRoot = new TagNode("root", root, null);
+		this.root = build(tmpRoot).firstChild;
 	}
 
-	private void replaceTag(TagNode parent, String oldTag, String newTag, int maxDepth) {
-		if (parent == null || maxDepth <= 0)
-			return;
+	private TagNode replaceTag(TagNode parent, String oldTag, String newTag, int maxDepth) {
+		if (parent == null)
+			return null;
+
+		if (maxDepth <= 0)
+			return parent;
 
 		if (parent.tag.equals(oldTag))
 			parent.tag = newTag;
 
-		replaceTag(parent.firstChild, oldTag, newTag, maxDepth - 1);
-		replaceTag(parent.sibling, oldTag, newTag, maxDepth);
+		parent.firstChild = replaceTag(parent.firstChild, oldTag, newTag, maxDepth - 1);
+		parent.sibling = replaceTag(parent.sibling, oldTag, newTag, maxDepth);
+
+		return parent;
 	}
 
-	private void replaceTag(TagNode parent, String oldTag, String newTag) {
-		replaceTag(parent, oldTag, newTag, Integer.MAX_VALUE);
+	private TagNode replaceTag(TagNode parent, String oldTag, String newTag) {
+		return replaceTag(parent, oldTag, newTag, Integer.MAX_VALUE);
 	}
 
 	/**
@@ -92,13 +97,14 @@ public class Tree {
 	 * @param newTag Replacement tag
 	 */
 	public void replaceTag(String oldTag, String newTag) {
-		/** COMPLETE THIS METHOD **/
-		TagNode newRoot = new TagNode("root", root, null);
-		replaceTag(newRoot, oldTag, newTag);
-		this.root = newRoot.firstChild;
+		TagNode tmpRoot = new TagNode("root", root, null);
+		this.root = replaceTag(tmpRoot, oldTag, newTag).firstChild;
 	}
 
 	private TagNode findTag(TagNode node, String tag) {
+		if (node == null)
+			return null;
+
 		if (node.tag.equals(tag))
 			return node;
 
@@ -123,26 +129,22 @@ public class Tree {
 	 * @param row Row to bold, first row is numbered 1 (not 0).
 	 */
 	public void boldRow(int row) {
+		// Can do it recursively.
+		row -= 1;
 		TagNode table = findTag(root, "table");
 
-		// Exit if no table.
 		if (table == null)
 			return;
 
-		TagNode tr = table.firstChild;
-
-		// Exit if no table rows.
-		if (tr == null)
-			return;
-
-		for (int i = 1; i < row; ++i)
-			// Check if there is a "tr" sibling before iterating.
-			if (tr.sibling != null)
-				tr = tr.sibling;
-			else
+		TagNode trs = table.firstChild;
+		for (int i = 0; i < row; ++i) {
+			if (trs == null)
 				return;
 
-		TagNode tds = tr.firstChild;
+			trs = trs.sibling;
+		}
+
+		TagNode tds = trs.firstChild;
 		while (tds != null) {
 			tds.firstChild = new TagNode("b", tds.firstChild, null);
 			tds = tds.sibling;
@@ -159,34 +161,28 @@ public class Tree {
 	 */
 	public void removeTag(String tag) {
 		TagNode tmpRoot = new TagNode("root", root, null);
-		removeTag(tmpRoot, tag);
-		this.root = tmpRoot.firstChild;
+		this.root = removeTag(tmpRoot, tag).firstChild;
 	}
 
-	public void removeTag(TagNode parent, String tag) {
+	public TagNode removeTag(TagNode parent, String removedTag) {
 		if (parent == null)
-			return;
+			return null;
 
-		TagNode headChild = new TagNode(null, null, parent.firstChild);
-		TagNode prevChild = headChild;
-		TagNode currChild = headChild.sibling;
+		if (parent.tag.equals(removedTag)) {
+			if (parent.tag.equals("ul") && removedTag.equals("ul"))
+				replaceTag(parent.firstChild, "li", "p", 1);
 
-		while (currChild != null) {
-			removeTag(currChild.firstChild, tag);
+			if (parent.tag.equals("ol") && removedTag.equals("ol"))
+				replaceTag(parent.firstChild, "li", "p", 1);
 
-			if (currChild.tag.equals(tag)) {
-				if (currChild.tag.equals("ul") || currChild.tag.equals("ol"))
-					replaceTag(currChild, "li", "p", 1);
-
-				prevChild.sibling = currChild.sibling;
-				currChild = insertAfter(prevChild, currChild.firstChild);
-			}
-
-			prevChild = currChild;
-			currChild = currChild.sibling;
+			TagNode childNodes = removeTag(parent.firstChild, removedTag);
+			return insertAfter(childNodes, removeTag(parent.sibling, removedTag));
 		}
 
-		parent.firstChild = headChild.sibling;
+		parent.firstChild = removeTag(parent.firstChild, removedTag);
+		parent.sibling = removeTag(parent.sibling, removedTag);
+
+		return parent;
 	}
 
 	/**
@@ -201,78 +197,87 @@ public class Tree {
 		this.root = tmpRoot.firstChild;
 	}
 
-	public TagNode constructTag(String text, String word, String tag) {
-		TagNode headNode = new TagNode(null, null, null);
-		TagNode tail = headNode;
-
+	private TagNode constructTag(String text, String word, String tag) {
 		StringTokenizer st = new StringTokenizer(text, "\t ", true);
-		String strAcc = "";
+		String out = "";
+		TagNode head = new TagNode(null, null, null);
+		TagNode ptr = head;
 
 		while (st.hasMoreTokens()) {
 			String tok = st.nextToken();
+			tok = tok.toLowerCase();
 
-			if (tok.contains(tag)) {
-				if (strAcc.length() > 0) {
-					tail.sibling = new TagNode(strAcc, null, null);
-					tail = tail.sibling;
+			boolean beginsWith = tok.indexOf(word.toLowerCase()) == 0;
+			if (beginsWith && tok.length() == word.length()
+					|| beginsWith && tok.length() == word.length() + 1 && isPunc(tok.charAt(tok.length() - 1))) {
+
+				if (out.length() > 0) {
+					ptr.sibling = new TagNode(out, null, null);
+					ptr = ptr.sibling;
+					out = "";
 				}
 
-				tail.sibling = new TagNode(tag, new TagNode(tok, null, null), null);
-				tail = tail.sibling;
+				TagNode tnWrap = new TagNode(tag, null, null);
+				tnWrap.firstChild = new TagNode(tok, null, null);
+				ptr.sibling = tnWrap;
+				ptr = ptr.sibling;
+
 			} else {
-				strAcc += tok;
+				out += tok;
 			}
 		}
 
-		if (strAcc.length() > 0) {
-			tail.sibling = new TagNode(strAcc, null, null);
-			tail = tail.sibling;
+		if (out.length() > 0) {
+			ptr.sibling = new TagNode(out, null, null);
+			ptr = ptr.sibling;
+			out = "";
 		}
 
-		return headNode.sibling;
+		return head.sibling;
 	}
 
 	private TagNode insertAfter(TagNode before, TagNode extension) {
-		TagNode next = before.sibling;
-		before.sibling = extension;
+		if (extension == null && before == null)
+			return null;
 
-		TagNode currNode = before;
-		while (currNode.sibling != null)
-			currNode = currNode.sibling;
+		if (extension == null)
+			return before;
 
-		currNode.sibling = next;
-		return currNode;
+		if (before == null)
+			return extension;
+
+		before.sibling = insertAfter(before.sibling, extension);
+		return before;
+	}
+
+	private boolean isPunc(char a) {
+		return a == ',' || a == '!' || a == '.' || a == '?' || a == ';';
+	}
+
+	private boolean isValidTag(String tag) {
+		String[] validTags = { "html", "body", "p", "em", "b", "table", "tr", "td", "ol", "ul", "li" };
+
+		for (String validTag : validTags)
+			if (validTag.equals(tag))
+				return true;
+
+		return false;
 	}
 
 	private TagNode addTag(TagNode parent, String word, String tag) {
 		if (parent == null)
 			return parent;
 
-		if (parent.firstChild == null)
-			return constructTag(parent.tag, word, tag);
+		if (parent.firstChild == null) {
+			TagNode addedNode = constructTag(parent.tag, word, tag);
+			TagNode siblingNodes = addTag(parent.sibling, word, tag);
+			return insertAfter(addedNode, siblingNodes);
+		}
 
-		addTag(parent.firstChild, word, tag);
-		return insertAfter(parent.firstChild, addTag(parent.sibling, word, tag));
+		parent.firstChild = addTag(parent.firstChild, word, tag);
+		parent.sibling = addTag(parent.sibling, word, tag);
 
-//		if (parent == null ) return;
-//		
-//		TagNode headChild = new TagNode(null, null, parent.firstChild);
-//		TagNode prevChild = headChild;
-//		TagNode currChild = headChild.sibling;
-//
-//		 
-//		while (currChild != null) {
-//			if (currChild.firstChild == null) {
-//				TagNode newTag = constructTag(currChild.tag, word, tag);
-//				// use circular linked list and replace (faster)
-//				insertAfter(prevChild, newTag);
-//			}
-//
-//			prevChild = currChild;
-//			currChild = prevChild.sibling;
-//		}
-//
-//		parent.firstChild = headChild.sibling;
+		return parent;
 	}
 
 	/**
