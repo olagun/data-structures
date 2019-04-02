@@ -167,14 +167,8 @@ public class Tree {
 	public TagNode removeTag(TagNode parent, String removedTag) {
 		if (parent == null)
 			return null;
-
+		
 		if (parent.tag.equals(removedTag)) {
-			if (parent.tag.equals("ul") && removedTag.equals("ul"))
-				replaceTag(parent.firstChild, "li", "p", 1);
-
-			if (parent.tag.equals("ol") && removedTag.equals("ol"))
-				replaceTag(parent.firstChild, "li", "p", 1);
-
 			TagNode childNodes = removeTag(parent.firstChild, removedTag);
 			return insertAfter(childNodes, removeTag(parent.sibling, removedTag));
 		}
