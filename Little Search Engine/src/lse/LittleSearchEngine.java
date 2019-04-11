@@ -52,8 +52,8 @@ public class LittleSearchEngine {
 			// Read the next line of the document.
 			String line = scanner.nextLine();
 
-			// Split the line string by any whitespace " ".
-			String[] lineTokens = line.split(" ");
+			// Split the line string by any whitespace "\s".
+			String[] lineTokens = line.split("\\s");
 
 			for (String token : lineTokens) {
 				// Get keyword from token.
@@ -88,7 +88,7 @@ public class LittleSearchEngine {
 	 */
 	public void mergeKeywords(HashMap<String, Occurrence> kws) {
 		// should check for doc duplicates?
-		
+
 		// Get all keys in the "kws" HashTable.
 		Set<String> keys = kws.keySet();
 
@@ -96,20 +96,17 @@ public class LittleSearchEngine {
 			// Occurrence in the "kws" HashTable.
 			Occurrence kwsOcc = kws.get(key);
 
-			if (this.keywordsIndex.containsKey(key)) {
-				// Get the occurrences in the main table.
-				ArrayList<Occurrence> occs = this.keywordsIndex.get(key);
+			this.keywordsIndex.putIfAbsent(key, new ArrayList<>());
 
-				// Add "kwsOcc" to the main table "occs".
-				occs.add(kwsOcc);
+			// Get the occurrences in the main table.
+			ArrayList<Occurrence> occs = this.keywordsIndex.get(key);
 
-				// Re-sort the array.
-				insertLastOccurrence(occs);
-			} else {
-				ArrayList<Occurrence> occs = new ArrayList<>();
-				occs.add(kwsOcc);
-				this.keywordsIndex.put(key, occs);
-			}
+			// Add "kwsOcc" to the main table "occs".
+			occs.add(kwsOcc);
+
+			// Re-sort the array.
+			insertLastOccurrence(occs);
+
 		}
 	}
 
@@ -142,7 +139,7 @@ public class LittleSearchEngine {
 	 * @return Keyword (word without trailing punctuation, LOWER CASE)
 	 */
 	public String getKeyword(String word) {
-		// Convert the word to lower case. (Case insensitive)
+		// Convert the word to lower case. (Treated as case insensitive)
 		word = word.toLowerCase();
 
 		// Find the last index.
@@ -167,6 +164,7 @@ public class LittleSearchEngine {
 		// Given the word is alphabetic, extract it from the string.
 		String keyword = word.substring(0, endingIndex + 1);
 
+		// If resulting keyword is empty, return null.
 		if (keyword.length() < 1) {
 			return null;
 		}
@@ -181,17 +179,8 @@ public class LittleSearchEngine {
 
 	private int binarySearch(Occurrence lastOcc, int lo, int hi, ArrayList<Occurrence> occs,
 			ArrayList<Integer> midpoints) {
-		if (occs.size() == 0) {
-			return 0;
-		}
-
-		if (lastOcc.frequency < occs.get(hi).frequency) {
-			return hi + 1;
-		}
-
-		int mid = -1;
 		while (lo <= hi) {
-			mid = (hi + lo) / 2;
+			int mid = (hi - lo) / 2 + lo;
 			midpoints.add(mid);
 
 			if (lastOcc.frequency == occs.get(mid).frequency) {
@@ -205,8 +194,7 @@ public class LittleSearchEngine {
 			}
 		}
 
-		// return the negative insertion point
-		return mid;
+		return lo;
 	}
 
 	/**
@@ -274,6 +262,30 @@ public class LittleSearchEngine {
 		sc.close();
 	}
 
+	public void addItems(ArrayList<Occurrence> occs, ArrayList<Occurrence> results, Set<String> seenDocs) {
+		if (occs == null)
+			return;
+
+		for (Occurrence occ : occs) {
+			if (!seenDocs.contains(occ.document)) {
+				results.add(occ);
+				seenDocs.add(occ.document);
+				insertLastOccurrence(results);
+			}
+		}
+	}
+
+	public ArrayList<String> first(ArrayList<Occurrence> occs, int top) {
+		ArrayList<String> out = new ArrayList<>();
+
+		for (int i = 0; i < top && i < occs.size(); ++i) {
+			Occurrence occ = occs.get(i);
+			out.add(occ.document);
+		}
+
+		return out;
+	}
+
 	/**
 	 * Search result for "kw1 or kw2". A document is in the result set if kw1 or kw2
 	 * occurs in that document. Result set is arranged in descending order of
@@ -297,56 +309,13 @@ public class LittleSearchEngine {
 	 *         documents. If there are no matches, returns null or empty array list.
 	 */
 	public ArrayList<String> top5search(String kw1, String kw2) {
-		// Create a HashMap to access occurrences by document filename.
-		// Document File Name => Occurrence
-		HashMap<String, Occurrence> searchResultMap = new HashMap<>();
+		ArrayList<Occurrence> searchResults = new ArrayList<>();
+		Set<String> seenDocs = new HashSet<>();
 
-		// Iterate though every key in the "keywordsIndex" HashMap.
-		for (String keywordKey : this.keywordsIndex.keySet()) {
-			// If the current "keywordKey" matches "kw1" or "kw2".
-			if (keywordKey.equals(kw1) || keywordKey.equals(kw2)) {
-				// For every keyword in "keywordsIndex", get the occurrences that we've found.
-				ArrayList<Occurrence> keywordOccs = this.keywordsIndex.get(keywordKey);
+		addItems(this.keywordsIndex.get(kw1), searchResults, seenDocs);
+		addItems(this.keywordsIndex.get(kw2), searchResults, seenDocs);
+//		stableSort();
 
-				// Iterate through every occurrence...
-				for (Occurrence occ : keywordOccs) {
-					// The document of the current occurrence.
-					String doc = occ.document;
-
-					// Add the frequency if we've seen it before, otherwise, add it to the HashMap.
-					if (searchResultMap.containsKey(doc)) {
-						Occurrence o = searchResultMap.get(doc);
-						o.frequency += occ.frequency;
-					} else {
-						searchResultMap.put(doc, occ);
-					}
-				}
-			}
-		}
-
-		ArrayList<Occurrence> searchResult = new ArrayList<Occurrence>();
-
-		// Insert "searchResultMap" values in decreasing order to an ArrayList.
-		for (Occurrence occ : searchResultMap.values()) {
-			searchResult.add(occ);
-			this.insertLastOccurrence(searchResult);
-		}
-
-		// If we had no matches, return null.
-		if (searchResult.size() == 0) {
-			return null;
-		}
-
-		// Since "searchResult" had items inserted in decreasing order,
-		// the first 5 are the top 5.
-		ArrayList<String> top5 = new ArrayList<>();
-
-		// Add the top five that are in the "searchResult" ArrayList.
-		for (int i = 0; i < 5 && i < searchResult.size(); ++i) {
-			Occurrence item = searchResult.get(i);
-			top5.add(item.document);
-		}
-
-		return top5;
+		return first(searchResults, 5);
 	}
 }

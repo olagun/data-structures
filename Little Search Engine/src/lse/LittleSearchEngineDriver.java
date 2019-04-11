@@ -222,7 +222,7 @@ public class LittleSearchEngineDriver {
 
 		try {
 			Scanner sc = new Scanner(new File("docs.txt"));
-			while (true) {
+			while (sc.hasNext()) {
 				String ln = sc.nextLine();
 				System.out.printf(prefix + "loading keywords from '%s'\n", ln);
 				HashMap<String, Occurrence> hm = ls.loadKeywordsFromDocument(ln);
@@ -262,11 +262,14 @@ public class LittleSearchEngineDriver {
 				}
 				System.out.printf(prefix + "%d total keys\n", keys.length);
 
-				System.out.println(prefix + "📄 enter (v) to view the hashmap or enter to quit: ");
+				System.out.println(prefix + "📄 enter (v) to view the hashmap, (c) to continue, or enter to quit: ");
 
+				System.out.println(prefix + " > ");
 				String l = scn.nextLine();
 
-				if (l.equals("v")) {
+				if (l.equals("c")) {
+					continue;
+				} else if (l.equals("v")) {
 					for (Object key : keys) {
 						String s = (String) key;
 						// print each document and its frequency
@@ -289,6 +292,9 @@ public class LittleSearchEngineDriver {
 					break;
 				}
 			}
+
+			sc.close();
+
 		} catch (FileNotFoundException e) {
 			System.out.println(prefix + "couldn't find 'docs.txt'...");
 			System.out.println(prefix + "try redownloading them from sakai.");
